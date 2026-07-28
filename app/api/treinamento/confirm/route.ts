@@ -16,6 +16,17 @@ function getClientIp(request: Request): string | null {
 }
 
 export async function POST(request: Request) {
+  try {
+    return await handleConfirm(request);
+  } catch (error) {
+    // Nunca deixa a função quebrar sem responder JSON (ex.: variável de ambiente
+    // faltando em produção) — sempre volta um erro tratável para o cliente.
+    console.error("Erro inesperado em /api/treinamento/confirm:", error);
+    return NextResponse.json({ error: "Erro inesperado. Tente novamente." }, { status: 500 });
+  }
+}
+
+async function handleConfirm(request: Request): Promise<NextResponse> {
   let body: unknown;
   try {
     body = await request.json();

@@ -6,10 +6,22 @@ import type {
 } from "@/types/treinamento";
 
 async function parseJsonOrThrow<T>(response: Response): Promise<T> {
-  const data = (await response.json()) as T | ApiErrorResponse;
+  const rawBody = await response.text();
+  let data: T | ApiErrorResponse | null = null;
+  if (rawBody) {
+    try {
+      data = JSON.parse(rawBody) as T | ApiErrorResponse;
+    } catch {
+      data = null;
+    }
+  }
+
   if (!response.ok) {
-    const message = (data as ApiErrorResponse).error ?? "Erro inesperado. Tente novamente.";
+    const message = (data as ApiErrorResponse | null)?.error ?? "Erro inesperado. Tente novamente.";
     throw new Error(message);
+  }
+  if (data === null) {
+    throw new Error("Erro inesperado. Tente novamente.");
   }
   return data as T;
 }
