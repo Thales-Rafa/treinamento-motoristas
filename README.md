@@ -6,7 +6,7 @@ de treinamentos obrigatórios de motoristas, com relatório administrativo prote
 ## Stack
 
 Next.js 15 (App Router) · TypeScript · TailwindCSS · shadcn/ui · Supabase (Postgres + Auth) ·
-Zod · React Hook Form · sonner · ua-parser-js · xlsx.
+Zod · React Hook Form · sonner · ua-parser-js · xlsx · @react-pdf/renderer · jszip.
 
 ## 1. Criar o projeto no Supabase
 
@@ -29,12 +29,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 APP_TOKEN_SECRET=
 TRAINING_VIDEO_DURATION_SECONDS=
 NEXT_PUBLIC_TRAINING_VIDEO_SRC=/videos/treinamento.mp4
+COMPANY_NAME="Fama Transporte Turismo Ltda"
+TRAINING_TITLE="Treinamento de Motoristas"
 ```
 
 - `APP_TOKEN_SECRET`: qualquer string aleatória longa (ex.: `openssl rand -hex 32`). É usada para
   assinar o token de sessão do treinamento — trocá-la invalida sessões em andamento.
 - `TRAINING_VIDEO_DURATION_SECONDS`: duração real do vídeo, em segundos. É a base da validação
   anti-fraude no servidor, então precisa bater com o arquivo real.
+- `COMPANY_NAME` / `TRAINING_TITLE`: usados só no cabeçalho do termo em PDF (ver abaixo).
 
 ## 3. Colocar o vídeo de treinamento
 
@@ -70,6 +73,16 @@ Abra [http://localhost:3000](http://localhost:3000) para o fluxo do motorista e
 - IP e User-Agent são capturados dos headers da requisição no servidor, não do payload enviado
   pelo cliente.
 
+## Termo de conclusão em PDF
+
+No relatório admin (`/admin`), cada motorista tem um botão para baixar um "Termo de
+Confirmação de Conclusão de Treinamento" em PDF (nome, matrícula, CPF, datas, duração
+assistida, IP, SO/navegador, ID único e um resumo dos controles anti-fraude aplicados).
+Também dá para selecionar vários motoristas (checkboxes) e baixar todos de uma vez como um
+`.zip` — limite de 100 por vez (`app/api/treinamento/certificados/route.tsx`). Não é uma
+assinatura digital com validade jurídica por si só, mas o documento carrega um código de
+verificação derivado dos dados do registro, útil para detectar alteração posterior.
+
 ## Deploy na Vercel
 
 1. Suba o repositório para o GitHub/GitLab/Bitbucket.
@@ -90,6 +103,7 @@ hooks/                  # useVideoGuard, useTrainingFlow, useTrainingsReport
 lib/
   supabase/             # clients Supabase (browser, server, service role, middleware)
   validators/           # validação de CPF
+  certificate/          # template do termo em PDF + hash de verificação
   token.ts              # token de sessão assinado (HMAC)
   exportTrainings.ts    # exportação CSV/Excel
 schemas/                # schemas Zod (compartilhados client/servidor)

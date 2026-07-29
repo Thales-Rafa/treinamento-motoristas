@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrainingsFilters } from "@/components/admin/TrainingsFilters";
 import { TrainingsTable } from "@/components/admin/TrainingsTable";
 import { ExportButtons } from "@/components/admin/ExportButtons";
+import { CertificatesBulkButton } from "@/components/admin/CertificatesBulkButton";
 import { useTrainingsReport } from "@/hooks/useTrainingsReport";
 import { createClient } from "@/lib/supabase/client";
 
@@ -31,6 +33,28 @@ export default function AdminDashboardPage() {
     isExporting,
     exportData,
   } = useTrainingsReport();
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectPage = useCallback((ids: string[], checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -58,7 +82,10 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-base font-medium">Motoristas concluintes</CardTitle>
-            <ExportButtons onLoadData={exportData} isLoading={isExporting} />
+            <div className="flex gap-2">
+              <CertificatesBulkButton selectedIds={Array.from(selectedIds)} />
+              <ExportButtons onLoadData={exportData} isLoading={isExporting} />
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <TrainingsFilters
@@ -79,6 +106,9 @@ export default function AdminDashboardPage() {
               pageSize={pageSize}
               totalCount={totalCount}
               onPageChange={setPage}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectPage={toggleSelectPage}
             />
           </CardContent>
         </Card>
