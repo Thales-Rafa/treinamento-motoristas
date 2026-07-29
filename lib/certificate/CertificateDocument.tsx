@@ -125,7 +125,9 @@ export function CertificateDocument({ training }: CertificateDocumentProps) {
         <View style={styles.row}>
           <Text style={styles.label}>Confirmação de conclusão</Text>
           <Text style={styles.value}>
-            {formatDate(training.created_at)} às {formatTime(training.created_at)}
+            {training.ended_at
+              ? `${formatDate(training.ended_at)} às ${formatTime(training.ended_at)}`
+              : "—"}
           </Text>
         </View>
         <View style={styles.row}>

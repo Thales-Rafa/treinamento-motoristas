@@ -7,21 +7,34 @@ type ExportRow = {
   Nome: string;
   Matrícula: string;
   CPF: string;
-  Data: string;
-  Hora: string;
   Status: string;
+  "Data de início": string;
+  "Hora de início": string;
+  "Data de conclusão": string;
+  "Hora de conclusão": string;
 };
 
-const HEADERS: (keyof ExportRow)[] = ["Nome", "Matrícula", "CPF", "Data", "Hora", "Status"];
+const HEADERS: (keyof ExportRow)[] = [
+  "Nome",
+  "Matrícula",
+  "CPF",
+  "Status",
+  "Data de início",
+  "Hora de início",
+  "Data de conclusão",
+  "Hora de conclusão",
+];
 
 function toRow(training: Treinamento): ExportRow {
   return {
     Nome: training.nome,
     Matrícula: training.matricula,
     CPF: formatCpf(training.cpf),
-    Data: formatDate(training.created_at),
-    Hora: formatTime(training.created_at),
-    Status: training.status,
+    Status: training.status === "concluido" ? "Concluído" : "Em andamento",
+    "Data de início": formatDate(training.started_at),
+    "Hora de início": formatTime(training.started_at),
+    "Data de conclusão": training.ended_at ? formatDate(training.ended_at) : "",
+    "Hora de conclusão": training.ended_at ? formatTime(training.ended_at) : "",
   };
 }
 

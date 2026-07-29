@@ -10,6 +10,7 @@ import { createHmac, timingSafeEqual } from "crypto";
  * para simular que assistiu ao vídeo mais rápido do que a duração real permite.
  */
 export interface TrainingTokenPayload {
+  id: string;
   nome: string;
   matricula: string;
   cpf: string;
@@ -70,6 +71,7 @@ export function verifyTrainingToken(token: string): TrainingTokenPayload | null 
   try {
     const payload = JSON.parse(base64UrlDecode(payloadEncoded).toString("utf8")) as TrainingTokenPayload;
     if (
+      typeof payload.id !== "string" ||
       typeof payload.nome !== "string" ||
       typeof payload.matricula !== "string" ||
       typeof payload.cpf !== "string" ||

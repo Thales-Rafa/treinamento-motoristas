@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,13 @@ import { ExportButtons } from "@/components/admin/ExportButtons";
 import { CertificatesBulkButton } from "@/components/admin/CertificatesBulkButton";
 import { useTrainingsReport } from "@/hooks/useTrainingsReport";
 import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
+import type { TreinamentoStatus } from "@/types/treinamento";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
+  const [statusView, setStatusView] = useState<TreinamentoStatus>("concluido");
+
   const {
     search,
     setSearch,
@@ -32,9 +36,13 @@ export default function AdminDashboardPage() {
     isLoading,
     isExporting,
     exportData,
-  } = useTrainingsReport();
+  } = useTrainingsReport(statusView);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [statusView]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -70,7 +78,9 @@ export default function AdminDashboardPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Relatório de treinamentos</h1>
             <p className="text-sm text-muted-foreground">
-              {totalCount} motorista{totalCount === 1 ? "" : "s"} concluíram o treinamento
+              {statusView === "concluido"
+                ? `${totalCount} motorista${totalCount === 1 ? "" : "s"} concluíram o treinamento`
+                : `${totalCount} motorista${totalCount === 1 ? "" : "s"} iniciaram e ainda não concluíram`}
             </p>
           </div>
           <Button type="button" variant="outline" onClick={handleLogout}>
@@ -79,11 +89,42 @@ export default function AdminDashboardPage() {
           </Button>
         </div>
 
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setStatusView("concluido")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              statusView === "concluido"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:text-foreground border",
+            )}
+          >
+            Concluídos
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatusView("em_andamento")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              statusView === "em_andamento"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:text-foreground border",
+            )}
+          >
+            Não concluíram
+          </button>
+        </div>
+
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="text-base font-medium">Motoristas concluintes</CardTitle>
+            <CardTitle className="text-base font-medium">
+              {statusView === "concluido" ? "Motoristas concluintes" : "Motoristas que não concluíram"}
+            </CardTitle>
             <div className="flex gap-2">
-              <CertificatesBulkButton selectedIds={Array.from(selectedIds)} />
+              {statusView === "concluido" && (
+                <CertificatesBulkButton selectedIds={Array.from(selectedIds)} />
+              )}
               <ExportButtons onLoadData={exportData} isLoading={isExporting} />
             </div>
           </CardHeader>
@@ -97,6 +138,7 @@ export default function AdminDashboardPage() {
               onDateToChange={setDateTo}
             />
             <TrainingsTable
+              statusView={statusView}
               data={data}
               isLoading={isLoading}
               sortColumn={sortColumn}

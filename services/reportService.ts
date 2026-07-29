@@ -1,11 +1,13 @@
 import { createClient } from "@/lib/supabase/client";
 import { onlyDigits } from "@/lib/validators/cpf";
-import type { Treinamento } from "@/types/treinamento";
+import type { Treinamento, TreinamentoStatus } from "@/types/treinamento";
 
 export interface TrainingsQueryParams {
+  status: TreinamentoStatus;
   search: string;
   dateFrom: string | null;
   dateTo: string | null;
+  dateColumn: keyof Treinamento;
   sortColumn: keyof Treinamento;
   sortAscending: boolean;
 }
@@ -17,12 +19,13 @@ export interface TrainingsQueryResult {
 
 function buildFilteredQuery(
   supabase: ReturnType<typeof createClient>,
-  { search, dateFrom, dateTo, sortColumn, sortAscending }: TrainingsQueryParams,
+  { status, search, dateFrom, dateTo, dateColumn, sortColumn, sortAscending }: TrainingsQueryParams,
   countExact: boolean,
 ) {
   let query = supabase
     .from("treinamentos")
-    .select("*", countExact ? { count: "exact" } : undefined);
+    .select("*", countExact ? { count: "exact" } : undefined)
+    .eq("status", status);
 
   const term = search.trim().replace(/[,()]/g, "");
   if (term) {
@@ -32,8 +35,8 @@ function buildFilteredQuery(
     query = query.or(orParts.join(","));
   }
 
-  if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00`);
-  if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59`);
+  if (dateFrom) query = query.gte(dateColumn, `${dateFrom}T00:00:00`);
+  if (dateTo) query = query.lte(dateColumn, `${dateTo}T23:59:59`);
 
   return query.order(sortColumn, { ascending: sortAscending });
 }

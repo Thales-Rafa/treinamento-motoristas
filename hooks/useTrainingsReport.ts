@@ -3,17 +3,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { fetchAllMatchingTrainings, fetchTrainings } from "@/services/reportService";
-import type { Treinamento } from "@/types/treinamento";
+import type { Treinamento, TreinamentoStatus } from "@/types/treinamento";
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
-export function useTrainingsReport() {
+/** Coluna mais relevante para ordenar/filtrar por data, dependendo do status. */
+function defaultDateColumn(status: TreinamentoStatus): keyof Treinamento {
+  return status === "concluido" ? "ended_at" : "started_at";
+}
+
+export function useTrainingsReport(status: TreinamentoStatus) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
-  const [sortColumn, setSortColumn] = useState<keyof Treinamento>("created_at");
+  const [sortColumn, setSortColumn] = useState<keyof Treinamento>(defaultDateColumn(status));
   const [sortAscending, setSortAscending] = useState(false);
   const [page, setPage] = useState(0);
 
@@ -21,6 +26,16 @@ export function useTrainingsReport() {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Ao trocar de aba (status), volta para os padrões daquela visão.
+  useEffect(() => {
+    setSortColumn(defaultDateColumn(status));
+    setSortAscending(false);
+    setSearch("");
+    setDateFrom(null);
+    setDateTo(null);
+    setPage(0);
+  }, [status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
@@ -32,8 +47,16 @@ export function useTrainingsReport() {
   }, [debouncedSearch, dateFrom, dateTo]);
 
   const queryParams = useMemo(
-    () => ({ search: debouncedSearch, dateFrom, dateTo, sortColumn, sortAscending }),
-    [debouncedSearch, dateFrom, dateTo, sortColumn, sortAscending],
+    () => ({
+      status,
+      search: debouncedSearch,
+      dateFrom,
+      dateTo,
+      dateColumn: defaultDateColumn(status),
+      sortColumn,
+      sortAscending,
+    }),
+    [status, debouncedSearch, dateFrom, dateTo, sortColumn, sortAscending],
   );
 
   const load = useCallback(async () => {

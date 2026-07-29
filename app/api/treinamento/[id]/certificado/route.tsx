@@ -28,6 +28,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Treinamento não encontrado." }, { status: 404 });
     }
 
+    if (training.status !== "concluido") {
+      return NextResponse.json({ error: "Este treinamento ainda não foi concluído." }, { status: 400 });
+    }
+
     const buffer = await renderToBuffer(<CertificateDocument training={training as Treinamento} />);
 
     return new NextResponse(new Uint8Array(buffer), {

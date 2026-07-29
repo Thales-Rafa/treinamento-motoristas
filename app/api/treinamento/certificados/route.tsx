@@ -37,10 +37,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
-    const { data: trainings, error } = await supabase.from("treinamentos").select("*").in("id", ids);
+    const { data: trainings, error } = await supabase
+      .from("treinamentos")
+      .select("*")
+      .in("id", ids)
+      .eq("status", "concluido");
 
     if (error || !trainings || trainings.length === 0) {
-      return NextResponse.json({ error: "Nenhum treinamento encontrado." }, { status: 404 });
+      return NextResponse.json(
+        { error: "Nenhum treinamento concluído encontrado para os itens selecionados." },
+        { status: 404 },
+      );
     }
 
     const zip = new JSZip();

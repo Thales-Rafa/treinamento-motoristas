@@ -8,12 +8,12 @@ create table if not exists public.treinamentos (
   nome text not null,
   matricula text not null,
   cpf text not null,
-  status text not null default 'concluido' check (status in ('concluido')),
-  video_concluido boolean not null default true,
-  duracao_assistida integer not null,
+  status text not null default 'em_andamento' check (status in ('em_andamento', 'concluido')),
+  video_concluido boolean not null default false,
+  duracao_assistida integer not null default 0,
   duracao_video integer not null,
   started_at timestamptz not null,
-  ended_at timestamptz not null default now(),
+  ended_at timestamptz,
   tempo_total_pagina integer,
   ip text,
   user_agent text,
@@ -22,7 +22,8 @@ create table if not exists public.treinamentos (
   created_at timestamptz not null default now()
 );
 
--- Impede que o mesmo CPF conclua o treinamento mais de uma vez.
+-- No máximo 1 linha por CPF: reentrar no link atualiza a mesma linha (status
+-- 'em_andamento') em vez de criar outra, e uma vez 'concluido' não pode ser refeito.
 create unique index if not exists treinamentos_cpf_key on public.treinamentos (cpf);
 
 create index if not exists treinamentos_created_at_idx on public.treinamentos (created_at desc);

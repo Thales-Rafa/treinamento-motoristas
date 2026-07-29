@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { UAParser } from "ua-parser-js";
 import { confirmTrainingSchema } from "@/schemas/confirmTraining.schema";
 import { driverInfoSchema } from "@/schemas/driverInfo.schema";
 import { verifyTrainingToken } from "@/lib/token";
 import { createServiceRoleClient } from "@/lib/supabase/service";
+import { getClientIp, getDeviceInfo } from "@/lib/requestMetadata";
 import type { ConfirmTrainingResponse } from "@/types/treinamento";
 
 // Margem de tolerância (segundos) para variações de rede/precisão do player.
 const TOLERANCE_SECONDS = 5;
-
-function getClientIp(request: Request): string | null {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) return forwardedFor.split(",")[0]?.trim() ?? null;
-  return request.headers.get("x-real-ip");
-}
 
 export async function POST(request: Request) {
   try {
@@ -62,7 +56,7 @@ async function handleConfirm(request: Request): Promise<NextResponse> {
   if (!driverInfo.success) {
     return NextResponse.json({ error: "Dados da sessão inválidos." }, { status: 400 });
   }
-  const { nome, matricula, cpf } = driverInfo.data;
+  const { cpf } = driverInfo.data;
 
   const videoDurationSeconds = Number(process.env.TRAINING_VIDEO_DURATION_SECONDS ?? 0);
 
@@ -87,60 +81,56 @@ async function handleConfirm(request: Request): Promise<NextResponse> {
   }
 
   const supabase = createServiceRoleClient();
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const { sistemaOperacional, navegador } = getDeviceInfo(userAgent);
+  const ip = getClientIp(request);
 
-  const { data: existing } = await supabase
+  // Atualiza a MESMA linha criada em /start (por id, vindo do token) — nunca insere uma
+  // nova. A condição `status = em_andamento` garante atomicidade: se a linha já tiver
+  // sido concluída por outra requisição (ex.: duas abas), 0 linhas são afetadas aqui.
+  const { data: updated, error: updateError } = await supabase
     .from("treinamentos")
-    .select("id")
+    .update({
+      status: "concluido",
+      video_concluido: true,
+      duracao_assistida: Math.round(duracaoAssistida),
+      duracao_video: videoDurationSeconds,
+      ended_at: new Date().toISOString(),
+      tempo_total_pagina: Math.round(tempoTotalPagina),
+      ip,
+      user_agent: userAgent || null,
+      sistema_operacional: sistemaOperacional,
+      navegador,
+    })
+    .eq("id", tokenPayload.id)
     .eq("cpf", cpf)
+    .eq("status", "em_andamento")
+    .select("id, ended_at")
     .maybeSingle();
 
-  if (existing) {
+  if (updateError) {
+    if (updateError.code === "23505") {
+      return NextResponse.json(
+        { error: "Este CPF já concluiu este treinamento." },
+        { status: 409 },
+      );
+    }
+    console.error("Erro ao registrar conclusão do treinamento:", updateError);
+    return NextResponse.json({ error: "Erro ao registrar o treinamento." }, { status: 500 });
+  }
+
+  if (!updated) {
+    // Sessão não encontrada mais como "em andamento" — ou já foi concluída antes,
+    // ou o registro não existe (token muito antigo/corrompido).
     return NextResponse.json(
       { error: "Este CPF já concluiu este treinamento." },
       { status: 409 },
     );
   }
 
-  const userAgent = request.headers.get("user-agent") ?? "";
-  const { os, browser } = UAParser(userAgent);
-  const ip = getClientIp(request);
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("treinamentos")
-    .insert({
-      nome,
-      matricula,
-      cpf,
-      status: "concluido",
-      video_concluido: true,
-      duracao_assistida: Math.round(duracaoAssistida),
-      duracao_video: videoDurationSeconds,
-      started_at: new Date(tokenPayload.iat).toISOString(),
-      ended_at: new Date().toISOString(),
-      tempo_total_pagina: Math.round(tempoTotalPagina),
-      ip,
-      user_agent: userAgent || null,
-      sistema_operacional: os.name ? `${os.name} ${os.version ?? ""}`.trim() : null,
-      navegador: browser.name ? `${browser.name} ${browser.version ?? ""}`.trim() : null,
-    })
-    .select("id, created_at")
-    .single();
-
-  if (insertError) {
-    // Corrida entre a checagem de duplicidade e o insert: o índice único no banco garante
-    // consistência mesmo se duas requisições chegarem ao mesmo tempo.
-    if (insertError.code === "23505") {
-      return NextResponse.json(
-        { error: "Este CPF já concluiu este treinamento." },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ error: "Erro ao registrar o treinamento." }, { status: 500 });
-  }
-
   const response: ConfirmTrainingResponse = {
-    id: inserted.id,
-    createdAt: inserted.created_at,
+    id: updated.id,
+    createdAt: updated.ended_at,
   };
 
   return NextResponse.json(response, { status: 201 });
