@@ -37,7 +37,11 @@ export function DriverInfoForm({ onSubmit, isSubmitting }: DriverInfoFormProps) 
           autoComplete="name"
           placeholder="Digite seu nome completo"
           disabled={isSubmitting}
-          {...register("nome")}
+          {...register("nome", {
+            onChange: (event) => {
+              event.target.value = event.target.value.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ' ]/g, "");
+            },
+          })}
         />
         {errors.nome && <p className="text-sm text-destructive">{errors.nome.message}</p>}
       </div>
@@ -46,10 +50,15 @@ export function DriverInfoForm({ onSubmit, isSubmitting }: DriverInfoFormProps) 
         <Label htmlFor="matricula">Matrícula</Label>
         <Input
           id="matricula"
+          inputMode="numeric"
           autoComplete="off"
           placeholder="Digite sua matrícula"
           disabled={isSubmitting}
-          {...register("matricula")}
+          {...register("matricula", {
+            onChange: (event) => {
+              event.target.value = event.target.value.replace(/\D/g, "");
+            },
+          })}
         />
         {errors.matricula && (
           <p className="text-sm text-destructive">{errors.matricula.message}</p>

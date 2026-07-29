@@ -7,13 +7,14 @@ export const driverInfoSchema = z.object({
     .trim()
     .min(3, "Informe o nome completo.")
     .max(120, "Nome muito longo.")
-    .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ' ]+$/, "Use apenas letras e espaços."),
+    .regex(/^[A-Za-zÀ-ÖØ-öø-ÿ']+(\s[A-Za-zÀ-ÖØ-öø-ÿ']+)+$/, "Informe nome e sobrenome, só com letras.")
+    .refine((value) => value.split(" ").every((word) => word.length >= 2), "Cada nome deve ter pelo menos 2 letras."),
   matricula: z
     .string()
     .trim()
     .min(1, "Informe a matrícula.")
-    .max(30, "Matrícula muito longa.")
-    .regex(/^[A-Za-z0-9.-]+$/, "Matrícula inválida."),
+    .max(20, "Matrícula muito longa.")
+    .regex(/^\d+$/, "Matrícula deve conter apenas números."),
   cpf: z
     .string()
     .trim()
