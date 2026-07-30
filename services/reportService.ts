@@ -12,20 +12,15 @@ export interface TrainingsQueryParams {
   sortAscending: boolean;
 }
 
-export interface TrainingsQueryResult {
-  data: Treinamento[];
-  count: number;
-}
+// Sem paginação: a lista inteira é carregada de uma vez (facilita selecionar todos).
+// Esse teto é só uma proteção contra uma consulta acidentalmente gigante.
+const MAX_ROWS = 5000;
 
 function buildFilteredQuery(
   supabase: ReturnType<typeof createClient>,
   { status, search, dateFrom, dateTo, dateColumn, sortColumn, sortAscending }: TrainingsQueryParams,
-  countExact: boolean,
 ) {
-  let query = supabase
-    .from("treinamentos")
-    .select("*", countExact ? { count: "exact" } : undefined)
-    .eq("status", status);
+  let query = supabase.from("treinamentos").select("*").eq("status", status);
 
   const term = search.trim().replace(/[,()]/g, "");
   if (term) {
@@ -38,29 +33,13 @@ function buildFilteredQuery(
   if (dateFrom) query = query.gte(dateColumn, `${dateFrom}T00:00:00`);
   if (dateTo) query = query.lte(dateColumn, `${dateTo}T23:59:59`);
 
-  return query.order(sortColumn, { ascending: sortAscending });
+  return query.order(sortColumn, { ascending: sortAscending }).range(0, MAX_ROWS - 1);
 }
 
-export async function fetchTrainings(
-  params: TrainingsQueryParams & { page: number; pageSize: number },
-): Promise<TrainingsQueryResult> {
+/** Busca todos os registros que casam com o filtro atual (lista e exportação usam a mesma). */
+export async function fetchTrainings(params: TrainingsQueryParams): Promise<Treinamento[]> {
   const supabase = createClient();
-  const { page, pageSize } = params;
-  const from = page * pageSize;
-  const to = from + pageSize - 1;
-
-  const { data, count, error } = await buildFilteredQuery(supabase, params, true).range(from, to);
-  if (error) throw new Error(error.message);
-
-  return { data: (data ?? []) as Treinamento[], count: count ?? 0 };
-}
-
-/** Busca todos os registros que casam com o filtro atual (para exportação). */
-export async function fetchAllMatchingTrainings(
-  params: TrainingsQueryParams,
-): Promise<Treinamento[]> {
-  const supabase = createClient();
-  const { data, error } = await buildFilteredQuery(supabase, params, false).range(0, 9999);
+  const { data, error } = await buildFilteredQuery(supabase, params);
   if (error) throw new Error(error.message);
   return (data ?? []) as Treinamento[];
 }

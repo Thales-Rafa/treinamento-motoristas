@@ -28,9 +28,6 @@ export default function AdminDashboardPage() {
     sortColumn,
     sortAscending,
     toggleSort,
-    page,
-    setPage,
-    pageSize,
     data,
     totalCount,
     isLoading,
@@ -56,7 +53,7 @@ export default function AdminDashboardPage() {
     });
   }, []);
 
-  const toggleSelectPage = useCallback((ids: string[], checked: boolean) => {
+  const toggleSelectAll = useCallback((ids: string[], checked: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       ids.forEach((id) => (checked ? next.add(id) : next.delete(id)));
@@ -144,13 +141,9 @@ export default function AdminDashboardPage() {
               sortColumn={sortColumn}
               sortAscending={sortAscending}
               onSort={toggleSort}
-              page={page}
-              pageSize={pageSize}
-              totalCount={totalCount}
-              onPageChange={setPage}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
-              onToggleSelectPage={toggleSelectPage}
+              onToggleSelectAll={toggleSelectAll}
             />
           </CardContent>
         </Card>

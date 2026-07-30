@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { fetchAllMatchingTrainings, fetchTrainings } from "@/services/reportService";
+import { fetchTrainings } from "@/services/reportService";
 import type { Treinamento, TreinamentoStatus } from "@/types/treinamento";
 
-const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 400;
 
 /** Coluna mais relevante para ordenar/filtrar por data, dependendo do status. */
@@ -20,10 +19,8 @@ export function useTrainingsReport(status: TreinamentoStatus) {
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<keyof Treinamento>(defaultDateColumn(status));
   const [sortAscending, setSortAscending] = useState(false);
-  const [page, setPage] = useState(0);
 
   const [data, setData] = useState<Treinamento[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -34,17 +31,12 @@ export function useTrainingsReport(status: TreinamentoStatus) {
     setSearch("");
     setDateFrom(null);
     setDateTo(null);
-    setPage(0);
   }, [status]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
   }, [search]);
-
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch, dateFrom, dateTo]);
 
   const queryParams = useMemo(
     () => ({
@@ -62,15 +54,14 @@ export function useTrainingsReport(status: TreinamentoStatus) {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await fetchTrainings({ ...queryParams, page, pageSize: PAGE_SIZE });
-      setData(result.data);
-      setTotalCount(result.count);
+      const result = await fetchTrainings(queryParams);
+      setData(result);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Erro ao carregar treinamentos.");
     } finally {
       setIsLoading(false);
     }
-  }, [queryParams, page]);
+  }, [queryParams]);
 
   useEffect(() => {
     load();
@@ -91,7 +82,7 @@ export function useTrainingsReport(status: TreinamentoStatus) {
   const exportData = useCallback(async () => {
     setIsExporting(true);
     try {
-      return await fetchAllMatchingTrainings(queryParams);
+      return await fetchTrainings(queryParams);
     } catch {
       toast.error("Erro ao preparar exportação.");
       return [];
@@ -110,11 +101,8 @@ export function useTrainingsReport(status: TreinamentoStatus) {
     sortColumn,
     sortAscending,
     toggleSort,
-    page,
-    setPage,
-    pageSize: PAGE_SIZE,
     data,
-    totalCount,
+    totalCount: data.length,
     isLoading,
     isExporting,
     exportData,

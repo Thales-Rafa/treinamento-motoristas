@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -39,14 +39,12 @@ interface TrainingsTableProps {
   sortColumn: keyof Treinamento;
   sortAscending: boolean;
   onSort: (column: keyof Treinamento) => void;
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  onPageChange: (page: number) => void;
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
-  onToggleSelectPage: (ids: string[], checked: boolean) => void;
+  onToggleSelectAll: (ids: string[], checked: boolean) => void;
 }
+
+const SKELETON_ROWS = 6;
 
 export function TrainingsTable({
   statusView,
@@ -55,24 +53,17 @@ export function TrainingsTable({
   sortColumn,
   sortAscending,
   onSort,
-  page,
-  pageSize,
-  totalCount,
-  onPageChange,
   selectedIds,
   onToggleSelect,
-  onToggleSelectPage,
+  onToggleSelectAll,
 }: TrainingsTableProps) {
   const columns = buildColumns(statusView);
   const dateColumn = columns[3].key;
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
-  const rangeEnd = Math.min(totalCount, (page + 1) * pageSize);
 
-  const pageIds = data.map((training) => training.id);
-  const selectedOnPage = pageIds.filter((id) => selectedIds.has(id));
-  const allPageSelected = pageIds.length > 0 && selectedOnPage.length === pageIds.length;
-  const somePageSelected = selectedOnPage.length > 0 && !allPageSelected;
+  const allIds = data.map((training) => training.id);
+  const selectedCount = allIds.filter((id) => selectedIds.has(id)).length;
+  const allSelected = allIds.length > 0 && selectedCount === allIds.length;
+  const someSelected = selectedCount > 0 && !allSelected;
 
   return (
     <div className="space-y-4">
@@ -82,11 +73,11 @@ export function TrainingsTable({
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox
-                  checked={allPageSelected}
-                  indeterminate={somePageSelected}
-                  disabled={isLoading || pageIds.length === 0}
-                  onCheckedChange={(checked) => onToggleSelectPage(pageIds, checked === true)}
-                  aria-label="Selecionar todos desta página"
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  disabled={isLoading || allIds.length === 0}
+                  onCheckedChange={(checked) => onToggleSelectAll(allIds, checked === true)}
+                  aria-label="Selecionar todos"
                 />
               </TableHead>
               {columns.map((column) => (
@@ -111,7 +102,7 @@ export function TrainingsTable({
           </TableHeader>
           <TableBody>
             {isLoading &&
-              Array.from({ length: pageSize }).map((_, index) => (
+              Array.from({ length: SKELETON_ROWS }).map((_, index) => (
                 <TableRow key={`skeleton-${index}`}>
                   <TableCell>
                     <Skeleton className="h-4 w-4" />
@@ -193,39 +184,10 @@ export function TrainingsTable({
         </Table>
       </div>
 
-      <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-        <p className="text-sm text-muted-foreground">
-          {totalCount > 0
-            ? `Mostrando ${rangeStart}–${rangeEnd} de ${totalCount}`
-            : "Nenhum resultado"}
-          {selectedIds.size > 0 && ` • ${selectedIds.size} selecionado(s)`}
-        </p>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 0 || isLoading}
-          >
-            <ChevronLeft className="h-4 w-4" />
-            Anterior
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {page + 1} de {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page + 1 >= totalPages || isLoading}
-          >
-            Próxima
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {data.length > 0 ? `${data.length} resultado${data.length === 1 ? "" : "s"}` : "Nenhum resultado"}
+        {selectedIds.size > 0 && ` • ${selectedIds.size} selecionado(s)`}
+      </p>
     </div>
   );
 }
