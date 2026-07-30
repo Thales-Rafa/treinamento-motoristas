@@ -21,7 +21,8 @@ export function TrainingFlow() {
     confirmCompletion,
   } = useTrainingFlow();
 
-  const { videoRef, progress, isCompleted, aspectRatio, getWatchedSeconds, handlers } = useVideoGuard();
+  const { videoRef, progress, isCompleted, aspectRatio, isStalled, reloadVideo, getWatchedSeconds, handlers } =
+    useVideoGuard();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (step === "success") {
@@ -63,6 +64,8 @@ export function TrainingFlow() {
           progress={progress}
           isCompleted={isCompleted}
           aspectRatio={aspectRatio}
+          isStalled={isStalled}
+          onReload={reloadVideo}
           onLoadedMetadata={handlers.onLoadedMetadata}
           onTimeUpdate={handlers.onTimeUpdate}
           onSeeking={handlers.onSeeking}

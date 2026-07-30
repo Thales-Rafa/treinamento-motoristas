@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, type RefObject } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { useState, type RefObject } from "react";
+import { Pause, Play, RotateCw, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,8 @@ interface TrainingVideoPlayerProps {
   isCompleted: boolean;
   /** Proporção largura/altura real do vídeo (ex.: 0.46 para um vídeo em retrato). */
   aspectRatio: number | null;
+  isStalled: boolean;
+  onReload: () => void;
   onLoadedMetadata: () => void;
   onTimeUpdate: () => void;
   onSeeking: () => void;
@@ -24,6 +26,8 @@ export function TrainingVideoPlayer({
   progress,
   isCompleted,
   aspectRatio,
+  isStalled,
+  onReload,
   onLoadedMetadata,
   onTimeUpdate,
   onSeeking,
@@ -31,7 +35,6 @@ export function TrainingVideoPlayer({
 }: TrainingVideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -51,10 +54,7 @@ export function TrainingVideoPlayer({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full max-w-3xl mx-auto rounded-xl border bg-card shadow-sm overflow-hidden"
-    >
+    <div className="w-full max-w-3xl mx-auto rounded-xl border bg-card shadow-sm overflow-hidden">
       <div className="flex justify-center bg-black">
         {/*
           A altura é o eixo que manda (limitada à viewport) e a largura é calculada a
@@ -73,33 +73,59 @@ export function TrainingVideoPlayer({
           <video
             ref={videoRef}
             src={src}
-            className="h-full w-full object-contain"
+            className="pointer-events-none h-full w-full object-contain"
             controls={false}
             controlsList="nodownload noremoteplayback nofullscreen"
             disablePictureInPicture
             disableRemotePlayback
             playsInline
-            onContextMenu={(event) => event.preventDefault()}
             onLoadedMetadata={onLoadedMetadata}
             onTimeUpdate={onTimeUpdate}
             onSeeking={onSeeking}
             onEnded={onEnded}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
-            onClick={togglePlay}
           />
 
-          {!isPlaying && (
-            <button
-              type="button"
-              onClick={togglePlay}
-              aria-label="Reproduzir vídeo"
-              className="absolute inset-0 flex items-center justify-center bg-black/30 transition hover:bg-black/40"
-            >
+          {/*
+            Overlay sempre presente por cima do vídeo: no Android/Chrome, tocar duas
+            vezes direto no <video> aciona o gesto nativo de avançar/voltar 10s, que
+            depois briga com o nosso bloqueio de avanço. Com o overlay, o toque nunca
+            chega ao elemento de vídeo (que fica com pointer-events-none acima).
+          */}
+          <button
+            type="button"
+            onClick={togglePlay}
+            onDoubleClick={(event) => event.preventDefault()}
+            onContextMenu={(event) => event.preventDefault()}
+            aria-label={isPlaying ? "Pausar vídeo" : "Reproduzir vídeo"}
+            className={cn(
+              "absolute inset-0 flex items-center justify-center transition",
+              !isPlaying && "bg-black/30 hover:bg-black/40",
+            )}
+          >
+            {!isPlaying && (
               <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-black shadow-lg">
                 <Play className="ml-1 h-7 w-7" fill="currentColor" />
               </span>
-            </button>
+            )}
+          </button>
+
+          {isStalled && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-4 text-center text-white">
+              <p className="text-sm">O vídeo travou. Toque para continuar de onde parou.</p>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onReload();
+                }}
+              >
+                <RotateCw className="h-4 w-4" />
+                Recarregar vídeo
+              </Button>
+            </div>
           )}
         </div>
       </div>
