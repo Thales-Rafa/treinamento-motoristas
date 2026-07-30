@@ -10,6 +10,8 @@ interface TrainingVideoPlayerProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   progress: number;
   isCompleted: boolean;
+  /** Proporção largura/altura real do vídeo (ex.: 0.46 para um vídeo em retrato). */
+  aspectRatio: number | null;
   onLoadedMetadata: () => void;
   onTimeUpdate: () => void;
   onSeeking: () => void;
@@ -21,6 +23,7 @@ export function TrainingVideoPlayer({
   videoRef,
   progress,
   isCompleted,
+  aspectRatio,
   onLoadedMetadata,
   onTimeUpdate,
   onSeeking,
@@ -52,38 +55,53 @@ export function TrainingVideoPlayer({
       ref={containerRef}
       className="w-full max-w-3xl mx-auto rounded-xl border bg-card shadow-sm overflow-hidden"
     >
-      <div className="relative aspect-video bg-black">
-        <video
-          ref={videoRef}
-          src={src}
-          className="h-full w-full"
-          controls={false}
-          controlsList="nodownload noremoteplayback nofullscreen"
-          disablePictureInPicture
-          disableRemotePlayback
-          playsInline
-          onContextMenu={(event) => event.preventDefault()}
-          onLoadedMetadata={onLoadedMetadata}
-          onTimeUpdate={onTimeUpdate}
-          onSeeking={onSeeking}
-          onEnded={onEnded}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onClick={togglePlay}
-        />
-
-        {!isPlaying && (
-          <button
-            type="button"
+      <div className="flex justify-center bg-black">
+        {/*
+          A altura é o eixo que manda (limitada à viewport) e a largura é calculada a
+          partir da proporção real do vídeo — funciona tanto para vídeo em retrato quanto
+          em paisagem, sem esticar nem sobrar barra preta além do necessário.
+        */}
+        <div
+          className="relative"
+          style={{
+            aspectRatio: aspectRatio ?? 16 / 9,
+            height: "min(75vh, 640px)",
+            maxWidth: "100%",
+            width: "auto",
+          }}
+        >
+          <video
+            ref={videoRef}
+            src={src}
+            className="h-full w-full object-contain"
+            controls={false}
+            controlsList="nodownload noremoteplayback nofullscreen"
+            disablePictureInPicture
+            disableRemotePlayback
+            playsInline
+            onContextMenu={(event) => event.preventDefault()}
+            onLoadedMetadata={onLoadedMetadata}
+            onTimeUpdate={onTimeUpdate}
+            onSeeking={onSeeking}
+            onEnded={onEnded}
+            onPlay={() => setIsPlaying(true)}
+            onPause={() => setIsPlaying(false)}
             onClick={togglePlay}
-            aria-label="Reproduzir vídeo"
-            className="absolute inset-0 flex items-center justify-center bg-black/30 transition hover:bg-black/40"
-          >
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-black shadow-lg">
-              <Play className="ml-1 h-7 w-7" fill="currentColor" />
-            </span>
-          </button>
-        )}
+          />
+
+          {!isPlaying && (
+            <button
+              type="button"
+              onClick={togglePlay}
+              aria-label="Reproduzir vídeo"
+              className="absolute inset-0 flex items-center justify-center bg-black/30 transition hover:bg-black/40"
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-black shadow-lg">
+                <Play className="ml-1 h-7 w-7" fill="currentColor" />
+              </span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 border-t bg-card px-4 py-3">
