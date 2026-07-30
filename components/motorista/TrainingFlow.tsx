@@ -35,9 +35,11 @@ export function TrainingFlow() {
           </CardDescription>
         </CardHeader>
         {trainingCode && (
-          <CardContent>
+          <CardContent className="flex flex-col items-center gap-2">
             <p className="text-sm text-muted-foreground">Código do treinamento</p>
-            <p className="font-mono text-sm">{trainingCode}</p>
+            <p className="w-full max-w-xs break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">
+              {trainingCode}
+            </p>
           </CardContent>
         )}
       </Card>
