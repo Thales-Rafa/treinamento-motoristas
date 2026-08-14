@@ -28,21 +28,37 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 APP_TOKEN_SECRET=
 TRAINING_VIDEO_DURATION_SECONDS=
-NEXT_PUBLIC_TRAINING_VIDEO_SRC=/videos/treinamento.mp4
+NEXT_PUBLIC_TRAINING_VIDEO_ID=
+NEXT_PUBLIC_TRAINING_VIDEO_ASPECT_RATIO=16/9
 COMPANY_NAME="Fama Transporte Turismo Ltda"
 TRAINING_TITLE="Treinamento de Motoristas"
 ```
 
 - `APP_TOKEN_SECRET`: qualquer string aleatória longa (ex.: `openssl rand -hex 32`). É usada para
   assinar o token de sessão do treinamento — trocá-la invalida sessões em andamento.
-- `TRAINING_VIDEO_DURATION_SECONDS`: duração real do vídeo, em segundos. É a base da validação
-  anti-fraude no servidor, então precisa bater com o arquivo real.
+- `TRAINING_VIDEO_DURATION_SECONDS`: duração real do vídeo no YouTube, em segundos. É a base da
+  validação anti-fraude no servidor, então precisa bater com o vídeo real.
+- `NEXT_PUBLIC_TRAINING_VIDEO_ASPECT_RATIO`: `"16/9"` para vídeo em paisagem ou `"9/16"` para
+  vídeo em retrato (caso comum de um Short). Se não bater com o vídeo real, ele aparece com
+  barras pretas ou espremido.
 - `COMPANY_NAME` / `TRAINING_TITLE`: usados só no cabeçalho do termo em PDF (ver abaixo).
 
 ## 3. Colocar o vídeo de treinamento
 
-Coloque o arquivo `.mp4` em `public/videos/treinamento.mp4` (ou ajuste o nome via
-`NEXT_PUBLIC_TRAINING_VIDEO_SRC`). Ajuste `TRAINING_VIDEO_DURATION_SECONDS` de acordo.
+O vídeo é hospedado no YouTube (não no projeto) para não consumir banda do deploy:
+
+1. Suba o vídeo no YouTube com visibilidade **Não listado** (não Privado — vídeo privado não
+   pode ser incorporado sem OAuth). Pode ser um vídeo normal ou um Short.
+2. Confirme em Studio > Detalhes que "Permitir incorporação" está habilitado (é o padrão).
+3. Copie o ID do vídeo e preencha `NEXT_PUBLIC_TRAINING_VIDEO_ID`:
+   - vídeo normal: o trecho depois de `v=` na URL
+     (`https://www.youtube.com/watch?v=dQw4w9WgXcQ` → `dQw4w9WgXcQ`).
+   - Short: o trecho depois de `/shorts/` na URL
+     (`https://youtube.com/shorts/fddbj4TcmN0` → `fddbj4TcmN0`).
+4. Confira a duração exata em segundos (Studio mostra com precisão) e preencha
+   `TRAINING_VIDEO_DURATION_SECONDS` de acordo.
+5. Ajuste `NEXT_PUBLIC_TRAINING_VIDEO_ASPECT_RATIO` conforme a orientação real do vídeo
+   (Shorts normalmente são `9/16`).
 
 ## 4. Rodar localmente
 
@@ -59,8 +75,9 @@ Abra [http://localhost:3000](http://localhost:3000) para o fluxo do motorista e
 - O botão "Confirmar que concluí o treinamento" só aparece no cliente depois do evento `ended`
   do vídeo — mas isso é só experiência de uso, não a barreira de segurança.
 - A barra de progresso do player é só visual (sem clique/arraste) e qualquer tentativa de pular
-  o vídeo (arrastar, atalhos de teclado, alterar `currentTime` via DevTools) é revertida em tempo
-  real pelo player (veja `hooks/useVideoGuard.ts`).
+  o vídeo (arrastar a barra nativa do YouTube, por exemplo) é detectada e revertida por um
+  polling na YouTube IFrame Player API (veja `hooks/useVideoGuard.ts`) — isso é só uma camada de
+  experiência de uso, não a barreira de segurança real (veja o próximo item).
 - Ao preencher nome/matrícula/CPF, o servidor emite um token assinado (HMAC) contendo o horário
   exato da liberação do vídeo (`app/api/treinamento/start`). Esse token não pode ser forjado pelo
   cliente.
@@ -89,7 +106,8 @@ verificação derivado dos dados do registro, útil para detectar alteração po
 2. Importe o projeto na Vercel.
 3. Configure as mesmas variáveis de ambiente do `.env.local` em **Project Settings > Environment
    Variables**.
-4. Faça o deploy. O vídeo em `public/videos` é servido como asset estático normalmente.
+4. Faça o deploy. O vídeo fica hospedado no YouTube — não é servido pelo deploy, então não conta
+   na banda do Vercel.
 
 ## Estrutura do projeto
 

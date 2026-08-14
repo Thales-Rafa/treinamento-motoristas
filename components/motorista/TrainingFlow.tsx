@@ -13,7 +13,7 @@ import { useVideoGuard } from "@/hooks/useVideoGuard";
 export function TrainingFlow() {
   const {
     step,
-    videoSrc,
+    videoId,
     isSubmittingForm,
     isConfirming,
     trainingCode,
@@ -21,8 +21,10 @@ export function TrainingFlow() {
     confirmCompletion,
   } = useTrainingFlow();
 
-  const { videoRef, progress, isCompleted, aspectRatio, isStalled, reloadVideo, getWatchedSeconds, handlers } =
-    useVideoGuard();
+  const { containerRef, progress, isCompleted, errorMessage, getWatchedSeconds } = useVideoGuard({
+    videoId,
+    toleranceSeconds: 4,
+  });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (step === "success") {
@@ -47,7 +49,7 @@ export function TrainingFlow() {
     );
   }
 
-  if (step === "video" && videoSrc) {
+  if (step === "video" && videoId) {
     return (
       <div className="flex w-full flex-col items-center gap-6">
         <div className="text-center">
@@ -59,17 +61,10 @@ export function TrainingFlow() {
         </div>
 
         <TrainingVideoPlayer
-          src={videoSrc}
-          videoRef={videoRef}
+          containerRef={containerRef}
           progress={progress}
           isCompleted={isCompleted}
-          aspectRatio={aspectRatio}
-          isStalled={isStalled}
-          onReload={reloadVideo}
-          onLoadedMetadata={handlers.onLoadedMetadata}
-          onTimeUpdate={handlers.onTimeUpdate}
-          onSeeking={handlers.onSeeking}
-          onEnded={handlers.onEnded}
+          errorMessage={errorMessage}
         />
 
         <Button

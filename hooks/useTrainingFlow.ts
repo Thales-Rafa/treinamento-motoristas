@@ -10,7 +10,7 @@ export type TrainingStep = "form" | "video" | "success";
 export function useTrainingFlow() {
   const [step, setStep] = useState<TrainingStep>("form");
   const [token, setToken] = useState<string | null>(null);
-  const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(null);
   const [videoDurationSeconds, setVideoDurationSeconds] = useState(0);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -23,7 +23,7 @@ export function useTrainingFlow() {
     try {
       const response = await startTraining(values);
       setToken(response.token);
-      setVideoSrc(response.videoSrc);
+      setVideoId(response.videoId);
       setVideoDurationSeconds(response.videoDurationSeconds);
       setStep("video");
     } catch (error) {
@@ -58,7 +58,7 @@ export function useTrainingFlow() {
 
   return {
     step,
-    videoSrc,
+    videoId,
     videoDurationSeconds,
     isSubmittingForm,
     isConfirming,

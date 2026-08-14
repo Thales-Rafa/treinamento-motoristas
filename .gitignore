@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vídeo de treinamento: hospedado no YouTube, não faz mais parte do deploy
+/public/videos/

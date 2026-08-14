@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const { nome, matricula, cpf } = parsed.data;
 
     const videoDurationSeconds = Number(process.env.TRAINING_VIDEO_DURATION_SECONDS ?? 0);
-    const videoSrc = process.env.NEXT_PUBLIC_TRAINING_VIDEO_SRC ?? "/videos/treinamento.mp4";
+    const videoId = process.env.NEXT_PUBLIC_TRAINING_VIDEO_ID ?? "";
     const userAgent = request.headers.get("user-agent") ?? "";
     const { sistemaOperacional, navegador } = getDeviceInfo(userAgent);
     const ip = getClientIp(request);
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
     const response: StartTrainingResponse = {
       token,
       startedAt: new Date(payload.iat).toISOString(),
-      videoSrc,
+      videoId,
       videoDurationSeconds,
     };
 

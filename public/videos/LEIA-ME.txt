@@ -1,6 +1,0 @@
-Coloque aqui o arquivo do vídeo de treinamento com o nome "treinamento.mp4"
-(ou ajuste NEXT_PUBLIC_TRAINING_VIDEO_SRC no .env se usar outro nome).
-
-Depois de colocar o vídeo, ajuste TRAINING_VIDEO_DURATION_SECONDS no .env
-com a duração real do arquivo, em segundos. Esse valor é usado pelo servidor
-para validar que o motorista realmente assistiu ao vídeo inteiro.

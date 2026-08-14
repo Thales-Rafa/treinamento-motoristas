@@ -1,97 +1,116 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useYouTubeIframeApi } from "./useYouTubeIframeApi";
 
 interface UseVideoGuardOptions {
-  /** Margem (segundos) tolerada antes de considerar um "seek" como tentativa de pular. */
+  /** ID do vídeo no YouTube (não listado). */
+  videoId: string | null;
+  /** Margem (segundos) tolerada antes de considerar um salto como tentativa de pular. */
   toleranceSeconds?: number;
 }
 
-/** Tempo (ms) sem progresso após um "waiting" para considerar o vídeo travado de verdade. */
-const STALL_TIMEOUT_MS = 8000;
+/** Intervalo (ms) do polling que checa a posição atual do player. */
+const POLL_INTERVAL_MS = 1000;
 
 /**
- * Controla a reprodução de um <video> nativo para impedir que o motorista avance o
- * treinamento: guarda o ponto mais distante já assistido (`maxTimeReached`, que só
- * cresce) e, a cada evento `seeking`, rebobina de volta caso o novo `currentTime`
- * ultrapasse esse ponto além da tolerância. Isso bloqueia arrastar a barra, atalhos de
- * teclado e alterações de `currentTime` via DevTools — pausar/retroceder continua livre.
- *
- * A tolerância é generosa (poucos segundos) de propósito: em celulares com conexão
- * instável o próprio navegador reajusta o `currentTime` sozinho ao rebufferizar, e uma
- * tolerância apertada demais fazia essa correção brigar com o navegador e travar o vídeo
- * em alguns aparelhos. A correção também é adiada com `requestAnimationFrame` (em vez de
- * mexer no `currentTime` dentro do próprio evento `seeking`), o que é mais estável entre
- * navegadores mobile.
- *
- * Além disso, o hook desativa os atalhos de avanço/retrocesso do próprio sistema (gesto
- * de tocar duas vezes no Chrome Android e os controles de mídia da notificação/tela de
- * bloqueio) — sem isso, esses gestos nativos disparavam o mesmo "seeking" que o nosso
- * bloqueio revertia, e a briga entre os dois é a causa mais provável de o vídeo travar em
- * alguns aparelhos. Como rede de segurança final, se o vídeo ficar "preso" (evento
- * `waiting` sem recuperar) por tempo demais, `isStalled` fica true e `reloadVideo` permite
- * recarregar sem perder o progresso já assistido.
+ * Controla um player embutido do YouTube (IFrame Player API) para impedir que o motorista
+ * avance o treinamento: guarda o ponto mais distante já assistido (`maxTimeReached`, que só
+ * cresce) e, a cada tick do polling, rebobina de volta caso `getCurrentTime()` ultrapasse esse
+ * ponto além da tolerância. A IFrame API não expõe um evento nativo de "seeking", então esse
+ * bloqueio é feito por polling em vez de reagir a um evento — mais lento que o bloqueio
+ * instantâneo usado com um <video> nativo, mas isso já era só uma camada de UX: a barreira de
+ * segurança real é o tempo decorrido checado no servidor (ver app/api/treinamento/confirm),
+ * que independe do player usado.
  */
-export function useVideoGuard({ toleranceSeconds = 4 }: UseVideoGuardOptions = {}) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+export function useVideoGuard({ videoId, toleranceSeconds = 4 }: UseVideoGuardOptions) {
+  const apiReady = useYouTubeIframeApi();
+  const playerRef = useRef<YT.Player | null>(null);
   const maxTimeReachedRef = useRef(0);
-  const lastCorrectionAtRef = useRef(0);
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const [progress, setProgress] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
-  const [isStalled, setIsStalled] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
 
-  const handleLoadedMetadata = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    setDuration(video.duration);
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      setAspectRatio(video.videoWidth / video.videoHeight);
-    }
+  const containerRef = useCallback((node: HTMLDivElement | null) => {
+    setContainerEl(node);
   }, []);
 
-  const handleTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.currentTime > maxTimeReachedRef.current) {
-      maxTimeReachedRef.current = video.currentTime;
-    }
-    if (video.duration > 0) {
-      setProgress(Math.min(100, (maxTimeReachedRef.current / video.duration) * 100));
-    }
-  }, []);
+  // Cria o player quando a API, o container e o videoId estiverem prontos; destrói ao trocar.
+  useEffect(() => {
+    if (!apiReady || !containerEl || !videoId || !window.YT) return;
 
-  const handleSeeking = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    // Evita brigar com o navegador enquanto ele ainda está carregando/rebufferizando.
-    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+    setPlayerReady(false);
+    setErrorMessage(null);
 
-    const now = Date.now();
-    if (now - lastCorrectionAtRef.current < 500) return;
+    // A IFrame API substitui o elemento recebido por um <iframe> próprio — se passássemos
+    // containerEl diretamente, o React perderia o nó que ele mesmo criou e gerenciar seu
+    // ciclo de vida (ex.: o remount duplo do Strict Mode em dev) quebraria a reconciliação.
+    // Por isso criamos aqui um filho fora do controle do React só pra API substituir.
+    const mountEl = document.createElement("div");
+    containerEl.appendChild(mountEl);
 
-    if (video.currentTime > maxTimeReachedRef.current + toleranceSeconds) {
-      lastCorrectionAtRef.current = now;
-      requestAnimationFrame(() => {
-        if (videoRef.current) {
-          videoRef.current.currentTime = maxTimeReachedRef.current;
-        }
-      });
-    }
-  }, [toleranceSeconds]);
+    const player = new window.YT.Player(mountEl, {
+      videoId,
+      playerVars: {
+        controls: 1,
+        disablekb: 1,
+        modestbranding: 1,
+        rel: 0,
+        iv_load_policy: 3,
+        playsinline: 1,
+        origin: window.location.origin,
+      },
+      events: {
+        onReady: () => setPlayerReady(true),
+        onStateChange: (event) => {
+          if (event.data === window.YT!.PlayerState.ENDED) {
+            maxTimeReachedRef.current = player.getDuration();
+            setProgress(100);
+            setIsCompleted(true);
+          }
+        },
+        onError: () => {
+          setErrorMessage("Não foi possível carregar o vídeo. Atualize a página e tente novamente.");
+        },
+      },
+    });
+    playerRef.current = player;
 
-  const handleEnded = useCallback(() => {
-    const video = videoRef.current;
-    if (video) maxTimeReachedRef.current = video.duration;
-    setIsCompleted(true);
-    setProgress(100);
-  }, []);
+    return () => {
+      player.destroy();
+      playerRef.current = null;
+      containerEl.replaceChildren();
+    };
+  }, [apiReady, containerEl, videoId]);
 
-  const getWatchedSeconds = useCallback(() => maxTimeReachedRef.current, []);
+  // Polling: impede avançar além do ponto máximo já assistido.
+  useEffect(() => {
+    if (!playerReady) return;
+    const interval = setInterval(() => {
+      const player = playerRef.current;
+      if (!player) return;
 
-  // Desliga seekforward/seekbackward/seekto do Media Session (notificação, tela de
-  // bloqueio, fone bluetooth) — essas ações também disparam "seeking" no vídeo.
+      const currentTime = player.getCurrentTime();
+      const duration = player.getDuration();
+
+      if (currentTime > maxTimeReachedRef.current) {
+        maxTimeReachedRef.current = currentTime;
+      } else if (currentTime > maxTimeReachedRef.current + toleranceSeconds) {
+        player.seekTo(maxTimeReachedRef.current, true);
+      }
+
+      if (duration > 0) {
+        setProgress(Math.min(100, (maxTimeReachedRef.current / duration) * 100));
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [playerReady, toleranceSeconds]);
+
+  // Desliga seekforward/seekbackward/seekto do Media Session (notificação, tela de bloqueio,
+  // fone bluetooth) — esses controles também poderiam ser usados pra pular à frente.
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
     const noop = () => {};
@@ -114,70 +133,13 @@ export function useVideoGuard({ toleranceSeconds = 4 }: UseVideoGuardOptions = {
     };
   }, []);
 
-  // Detecta travamento real (evento "waiting" sem recuperação) para oferecer um jeito de
-  // recarregar em vez de deixar o motorista preso sem nenhuma saída.
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    let stallTimer: ReturnType<typeof setTimeout> | null = null;
-    const clearStallTimer = () => {
-      if (stallTimer) {
-        clearTimeout(stallTimer);
-        stallTimer = null;
-      }
-    };
-    const handleWaiting = () => {
-      clearStallTimer();
-      stallTimer = setTimeout(() => setIsStalled(true), STALL_TIMEOUT_MS);
-    };
-    const handleRecovered = () => {
-      clearStallTimer();
-      setIsStalled(false);
-    };
-
-    video.addEventListener("waiting", handleWaiting);
-    video.addEventListener("playing", handleRecovered);
-    video.addEventListener("canplay", handleRecovered);
-    video.addEventListener("timeupdate", handleRecovered);
-
-    return () => {
-      clearStallTimer();
-      video.removeEventListener("waiting", handleWaiting);
-      video.removeEventListener("playing", handleRecovered);
-      video.removeEventListener("canplay", handleRecovered);
-      video.removeEventListener("timeupdate", handleRecovered);
-    };
-  }, []);
-
-  const reloadVideo = useCallback(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const resumeAt = maxTimeReachedRef.current;
-    setIsStalled(false);
-    const handleReady = () => {
-      video.currentTime = resumeAt;
-      video.play().catch(() => {});
-      video.removeEventListener("loadedmetadata", handleReady);
-    };
-    video.addEventListener("loadedmetadata", handleReady);
-    video.load();
-  }, []);
+  const getWatchedSeconds = useCallback(() => maxTimeReachedRef.current, []);
 
   return {
-    videoRef,
+    containerRef,
     progress,
     isCompleted,
-    duration,
-    aspectRatio,
-    isStalled,
-    reloadVideo,
+    errorMessage,
     getWatchedSeconds,
-    handlers: {
-      onLoadedMetadata: handleLoadedMetadata,
-      onTimeUpdate: handleTimeUpdate,
-      onSeeking: handleSeeking,
-      onEnded: handleEnded,
-    },
   };
 }

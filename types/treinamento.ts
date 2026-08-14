@@ -27,7 +27,7 @@ export interface Treinamento {
 export interface StartTrainingResponse {
   token: string;
   startedAt: string;
-  videoSrc: string;
+  videoId: string;
   videoDurationSeconds: number;
 }
 
