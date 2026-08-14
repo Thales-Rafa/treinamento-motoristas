@@ -49,6 +49,8 @@ export function useVideoGuard({ videoId, toleranceSeconds = 4 }: UseVideoGuardOp
     // ciclo de vida (ex.: o remount duplo do Strict Mode em dev) quebraria a reconciliação.
     // Por isso criamos aqui um filho fora do controle do React só pra API substituir.
     const mountEl = document.createElement("div");
+    mountEl.style.width = "100%";
+    mountEl.style.height = "100%";
     containerEl.appendChild(mountEl);
 
     const player = new window.YT.Player(mountEl, {
@@ -63,7 +65,16 @@ export function useVideoGuard({ videoId, toleranceSeconds = 4 }: UseVideoGuardOp
         origin: window.location.origin,
       },
       events: {
-        onReady: () => setPlayerReady(true),
+        onReady: (event) => {
+          // Sem isso, a API cria o <iframe> num tamanho fixo padrão (~640x390, formato
+          // paisagem) em vez de preencher o container — quebra feio em vídeo vertical.
+          const iframe = event.target.getIframe();
+          iframe.style.position = "absolute";
+          iframe.style.inset = "0";
+          iframe.style.width = "100%";
+          iframe.style.height = "100%";
+          setPlayerReady(true);
+        },
         onStateChange: (event) => {
           if (event.data === window.YT!.PlayerState.ENDED) {
             maxTimeReachedRef.current = player.getDuration();
@@ -95,10 +106,12 @@ export function useVideoGuard({ videoId, toleranceSeconds = 4 }: UseVideoGuardOp
       const currentTime = player.getCurrentTime();
       const duration = player.getDuration();
 
-      if (currentTime > maxTimeReachedRef.current) {
-        maxTimeReachedRef.current = currentTime;
-      } else if (currentTime > maxTimeReachedRef.current + toleranceSeconds) {
+      if (currentTime > maxTimeReachedRef.current + toleranceSeconds) {
+        // Salto pra frente (ex.: arrastou a barra) — reverte antes de considerar o ponto
+        // como assistido, senão a checagem abaixo nunca bloquearia nada.
         player.seekTo(maxTimeReachedRef.current, true);
+      } else if (currentTime > maxTimeReachedRef.current) {
+        maxTimeReachedRef.current = currentTime;
       }
 
       if (duration > 0) {
