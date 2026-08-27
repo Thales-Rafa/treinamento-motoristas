@@ -30,8 +30,9 @@ function buildFilteredQuery(
     query = query.or(orParts.join(","));
   }
 
-  if (dateFrom) query = query.gte(dateColumn, `${dateFrom}T00:00:00`);
-  if (dateTo) query = query.lte(dateColumn, `${dateTo}T23:59:59`);
+  if (dateFrom) query = query.gte(dateColumn, new Date(`${dateFrom}T00:00:00`).toISOString());
+  if (dateTo) query = query.lte(dateColumn, new Date(`${dateTo}T23:59:59.999`).toISOString());
+
 
   return query.order(sortColumn, { ascending: sortAscending }).range(0, MAX_ROWS - 1);
 }
